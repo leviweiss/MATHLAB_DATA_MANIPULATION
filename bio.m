@@ -1,4 +1,5 @@
 % constants
+global PPM;
 PPM = 5;
 
 % basic variables
@@ -20,13 +21,27 @@ matchedMatrix = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans)
 
 % functions
 function matchedMatrix = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans)
-
-counter = 0;
+global PPM;
+counter = 1;
 matchedMatrix = NaN(maxScanSize, numberOfScans);
     for column = 1:numberOfScans
         for row = 1:maxScanSize
             number = allPeaksSorted(row, column);
-            if matchedMatrix(number) && ~allPeaksSorted(number)
+            counterInMatchedMatrix = matchedMatrix(row, column);
+            if isnan(counterInMatchedMatrix) && ~isnan(number)
+                matchedMatrix(row, column) = counter;
+                lowerThreshold = number - number * PPM / 10 .^ 6;
+                upperThreshold = number + number * PPM / 10 .^ 6;
+                for columnInternal = (column+1):numberOfScans
+                    for rowInternal = 1:maxScanSize
+                        numberInternal = allPeaksSorted(rowInternal, columnInternal);
+                        if ~isnan(numberInternal)
+                            if (numberInternal >= lowerThreshold) && (numberInternal <= upperThreshold)
+                                matchedMatrix(rowInternal, columnInternal) = counter;
+                            end
+                        end
+                    end
+                end
                 counter = counter + 1;
             end
         end
