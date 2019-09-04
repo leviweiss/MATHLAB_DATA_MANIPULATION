@@ -12,30 +12,57 @@ allPeaks = getMatrixWithAllPeaks(selectedDataSample, numberOfScans, maxScanSize)
 allPeaksSorted = sort(allPeaks);
 
 % creating the matched data
-matchedMatrix = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans);
-
+% matchedWithoutAnyProcessing = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans);
+matchedWithConstantBuckets = processingWithConstantBuckets(allPeaksSorted, maxScanSize, numberOfScans);
 
 
 
 
 
 % functions
+function matchedMatrix = processingWithConstantBuckets(allPeaksSorted, maxScanSize, numberOfScans)
+
+matchedMatrix = NaN(maxScanSize, numberOfScans);
+bucketSize = 100;
+numberOfBuckets = maxScanSize / bucketSize;
+startingRow = 1;
+endingRow = bucketSize;
+for currBucketNumber = 1:numberOfBuckets
+    allPeaksSortedCutted = allPeaksSorted(startingRow:endingRow, :);
+    bucketMatchedMatrix = withoutAnyProcessing(allPeaksSortedCutted, bucketSize, numberOfScans);
+    matchedMatrix(startingRow:endingRow, :) = bucketMatchedMatrix;
+    startingRow = startingRow + bucketSize;
+    endingRow = endingRow + bucketSize;
+end
+
+reminder = rem(maxScanSize, bucketSize);
+if reminder ~= 0
+    
+end
+
+end
+
+
 function matchedMatrix = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans)
+
 global PPM;
 counter = 1;
 matchedMatrix = NaN(maxScanSize, numberOfScans);
     for column = 1:numberOfScans
         for row = 1:maxScanSize
             number = allPeaksSorted(row, column);
-            if matchedMatrix(number) && ~isnan(number)
+            counterInMatchedMatrix = matchedMatrix(row, column);
+            if isnan(counterInMatchedMatrix) && ~isnan(number)
                 matchedMatrix(row, column) = counter;
                 lowerThreshold = number - number * PPM / 10 .^ 6;
                 upperThreshold = number + number * PPM / 10 .^ 6;
-                for columnInternal = (column+1):maxScanSize
+                for columnInternal = (column+1):numberOfScans
                     for rowInternal = 1:maxScanSize
                         numberInternal = allPeaksSorted(rowInternal, columnInternal);
-                        if (numberInternal >= lowerThreshold) && (numberInternal <= upperThreshold)
-                            matchedMatrix(rowInternal, columnInternal) = counter;
+                        if ~isnan(numberInternal)
+                            if (numberInternal >= lowerThreshold) && (numberInternal <= upperThreshold)
+                                matchedMatrix(rowInternal, columnInternal) = counter;
+                            end
                         end
                     end
                 end

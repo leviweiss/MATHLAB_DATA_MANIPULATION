@@ -12,17 +12,41 @@ allPeaks = getMatrixWithAllPeaks(selectedDataSample, numberOfScans, maxScanSize)
 allPeaksSorted = sort(allPeaks);
 
 % creating the matched data
-matchedMatrix = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans);
-
-
+% matchedWithoutAnyProcessing = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans, 1);
+matchedWithConstantBuckets = processingWithConstantBuckets(allPeaksSorted, maxScanSize, numberOfScans);
 
 
 
 
 % functions
-function matchedMatrix = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans)
+function matchedMatrix = processingWithConstantBuckets(allPeaksSorted, maxScanSize, numberOfScans)
+
+matchedMatrix = NaN(maxScanSize, numberOfScans);
+bucketSize = 100;
+numberOfBuckets = maxScanSize / bucketSize;
+startingRow = 1;
+endingRow = bucketSize;
+startingCounter = 1;
+for currBucketNumber = 1:numberOfBuckets
+    allPeaksSortedCutted = allPeaksSorted(startingRow:endingRow, :);
+    [bucketMatchedMatrix, startingCounter] = withoutAnyProcessing(allPeaksSortedCutted, bucketSize, numberOfScans, startingCounter);
+    matchedMatrix(startingRow:endingRow, :) = bucketMatchedMatrix;
+    startingRow = startingRow + bucketSize;
+    endingRow = endingRow + bucketSize;
+end
+
+reminder = rem(maxScanSize, bucketSize);
+if reminder ~= 0
+    
+end
+
+end
+
+
+function [matchedMatrix, counter] = withoutAnyProcessing(allPeaksSorted, maxScanSize, numberOfScans, startingCounter)
+
 global PPM;
-counter = 1;
+counter = startingCounter;
 matchedMatrix = NaN(maxScanSize, numberOfScans);
     for column = 1:numberOfScans
         for row = 1:maxScanSize
