@@ -16,22 +16,35 @@ allPeaks = getMatrixWithAllPeaks(maxScanSize);
 [allPeaksMZ, allPeaksIntensity] = seperateIntensityFromMZ(allPeaks);
 
 % creating the matched data
-% matchedWithoutAnyProcessing = withoutAnyProcessing(allPeaksMZ, maxScanSize / 2, 1);
-matchedWithConstantBuckets = processingWithConstantBuckets(allPeaksMZ, maxScanSize / 2);
-
+[matchedWithoutAnyProcessing, numberOfComponenets] = withoutAnyProcessing(allPeaksMZ, maxScanSize / 2, 1);
+% [matchedWithConstantBuckets, numberOfComponenets] = processingWithConstantBuckets(allPeaksMZ, maxScanSize / 2);
+numberOfComponenets = numberOfComponenets - 1;
+finalMatrix = buildTheFinalMatrix(matchedWithoutAnyProcessing, allPeaksIntensity, numberOfComponenets);
 
 
 
 % functions
+function finalMatrix = buildTheFinalMatrix(matchedMatrix, allPeaksIntensity, numberOfComponenets)
+
+global numberOfSamples;
+finalMatrix = NaN(numberOfComponenets, numberOfSamples);
+for componentNumber = 1:numberOfComponenets
+    [rowsArray, columnsArray] = find(matchedMatrix == componentNumber);
+    for index = 1:length(rowsArray)
+        finalMatrix(componentNumber, columnsArray(index)) = allPeaksIntensity(rowsArray(index), columnsArray(index));
+    end
+end
+
+end
+
+
 function [allPeaksMZ, allPeaksIntensity] = seperateIntensityFromMZ(allPeaks)
 allPeaksMZ = allPeaks(1:2:end,:);
 allPeaksIntensity = allPeaks(2:2:end,:);
 end
 
 
-
-
-function matchedMatrix = processingWithConstantBuckets(allPeaks, maxScanSize)
+function [matchedMatrix, startingCounter] = processingWithConstantBuckets(allPeaks, maxScanSize)
 
 global numberOfSamples;
 matchedMatrix = NaN(maxScanSize, numberOfSamples);
@@ -53,7 +66,7 @@ if reminder ~= 0
     endingRow = startingRow + reminder - 1;
     bucketSize = reminder;
     allPeaksCutted = allPeaks(startingRow:endingRow, :);
-    bucketMatchedMatrix = withoutAnyProcessing(allPeaksCutted, bucketSize, startingCounter);
+    [bucketMatchedMatrix, startingCounter] = withoutAnyProcessing(allPeaksCutted, bucketSize, startingCounter);
     matchedMatrix(startingRow:endingRow, :) = bucketMatchedMatrix;
 end
 
@@ -88,9 +101,7 @@ matchedMatrix = NaN(maxScanSize, numberOfSamples);
             end
         end
     end
-        
 end
-
 
 
 function allPeaks = getMatrixWithAllPeaks(maxScanSize)
