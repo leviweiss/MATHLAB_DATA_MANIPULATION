@@ -11,14 +11,14 @@ global data;
 data = load('matlab.mat');
 
 % creating the matrix of data
-maxScanSize = getMaxScanSize();
+[maxScanSize, longestColumnIndex] = getMaxScanSize();
 allPeaks = getMatrixWithAllPeaks(maxScanSize);
 [allPeaksMZ, allPeaksIntensity] = seperateIntensityFromMZ(allPeaks);
 
 % creating the matched data
-[matchedWithoutAnyProcessing, numberOfComponenets] = withoutAnyProcessing(allPeaksMZ, maxScanSize / 2, 1);
+% [matchedWithoutAnyProcessing, numberOfComponenets] = withoutAnyProcessing(allPeaksMZ, maxScanSize / 2, 1);
 % [matchedWithConstantBuckets, numberOfComponenets] = processingWithConstantBuckets(allPeaksMZ, maxScanSize / 2);
-% [matchedWithoutAnyProcessing, numberOfComponenets] = processingWithRangesOfFirstSample(allPeaksMZ, maxScanSize / 2);
+[matchedWithoutAnyProcessing, numberOfComponenets] = processingWithRangesOfFirstSample(allPeaksMZ, maxScanSize / 2, longestColumnIndex);
 
 
 
@@ -29,12 +29,31 @@ finalMatrix = buildTheFinalMatrix(matchedWithoutAnyProcessing, allPeaksIntensity
 
 
 % functions
-function [matchedMatrix, startingCounter] = processingWithRangesOfFirstSample(allPeaks, maxScanSize)
+function [matchedMatrix, startingCounter] = processingWithRangesOfFirstSample(allPeaks, maxScanSize, longestColumnIndex)
 global numberOfSamples;
 matchedMatrix = NaN(maxScanSize, numberOfSamples);
-lowMZ = data.data{1, currSample}.scan.lowMz;
-highMZ = data.data{1, currSample}.scan.highMz;
+% lowMZ = data.data{1, currSample}.scan.lowMz;
+% highMZ = data.data{1, currSample}.scan.highMz;
+numberOfBuckets = 10;
+startAndEndBucketMZ = getStartAndEndBucketMZ(allPeaks(:, longestColumnIndex), numberOfBuckets, maxScanSize);
+end
 
+
+function startAndEndBucketMZ = getStartAndEndBucketMZ(columnPeaks, numberOfBuckets, maxScanSize)
+startAndEndBucketMZ = NaN(numberOfBuckets, 2);
+numberOfRowsInBucket = floor(maxScanSize / numberOfBuckets);
+reminder = rem(maxScanSize, numberOfBuckets);
+startingRow = 1;
+endingRow = startingRow + numberOfRowsInBucket - 1;
+for row = 1:(numberOfBuckets - 1)
+    startAndEndBucketMZ(row, 1) = columnPeaks(startingRow);
+    startAndEndBucketMZ(row, 2) = columnPeaks(endingRow);
+    startingRow = endingRow + 1;
+    endingRow = startingRow + numberOfRowsInBucket - 1;
+end
+
+startAndEndBucketMZ(numberOfBuckets, 1) = columnPeaks(startingRow);
+startAndEndBucketMZ(numberOfBuckets, 2) = columnPeaks(endingRow + reminder);
 end
 
 
@@ -143,16 +162,18 @@ end
 end
 
 
-function maxSize = getMaxScanSize()
+function [maxSize, index] = getMaxScanSize()
 
 global numberOfSamples;
 global data;
 maxSize = 0;
+index = 0;
 for currSample = 1:numberOfSamples
     currSize = data.data{1, currSample}.scan.peaksCount;
     currSize = currSize * 2;
     if currSize > maxSize
         maxSize = currSize;
+        index = currSample;
     end
 end
 
