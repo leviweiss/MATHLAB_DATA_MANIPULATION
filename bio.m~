@@ -2,7 +2,7 @@
 global PPM;
 PPM = 5;
 global numberOfSamples;
-numberOfSamples = 100;
+numberOfSamples = 20;
 global selectedIndexOfScan;
 selectedIndexOfScan = 1;
 global data;
@@ -106,6 +106,10 @@ matchedMatrix = NaN(maxScanSize, numberOfSamples);
                     rowFound = find(columnData >= lowerThreshold & columnData <= upperThreshold);
                     if ~isempty(rowFound)
                         matchedMatrix(rowFound, columnInternal) = counter;
+                        [sizeR, sizeC] = size(rowFound);
+                        if sizeC >= 1
+                           x = 3; 
+                        end
                     end
                     
                     
