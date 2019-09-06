@@ -34,8 +34,38 @@ global numberOfSamples;
 matchedMatrix = NaN(maxScanSize, numberOfSamples);
 % lowMZ = data.data{1, currSample}.scan.lowMz;
 % highMZ = data.data{1, currSample}.scan.highMz;
+startingCounter = 1;
 numberOfBuckets = 10;
 startAndEndBucketMZ = getStartAndEndBucketMZ(allPeaks(:, longestColumnIndex), numberOfBuckets, maxScanSize);
+startAndEndIndex = getStartAndEndIndex(allPeaks, startAndEndBucketMZ, numberOfBuckets);
+for row = 1:numberOfBuckets
+    startingMZ = startAndEndBucketMZ(row, 1);
+    endingMZ = startAndEndBucketMZ(row, 2);
+    [startingBucketIndex, endingBucketIndex] = getStartingAndEndingBucketIndex(allPeaks, startingMZ, endingMZ);
+    bucketSize = endingBucketIndex - startingBucketIndex + 1;
+    allPeaksCutted = allPeaks(startingBucketIndex:endingBucketIndex, :);
+    [bucketMatchedMatrix, startingCounter] = withoutAnyProcessing(allPeaksCutted, bucketSize, startingCounter);
+    matchedMatrix(startingRow:endingRow, :) = bucketMatchedMatrix;
+end
+
+end
+
+
+function startAndEndIndex = getStartAndEndIndex(allPeaks, startAndEndBucketMZ, numberOfBuckets)
+global numberOfSamples;
+global PPM;
+startAndEndIndex = NaN(numberOfBuckets, numberOfSamples);
+startAndEndIndex(1, :) = 1;
+for bucketNumber = 1:numberOfBuckets
+    startingMZ = startAndEndBucketMZ(bucketNumber, 1);
+    thresholdFromBelow = startingMZ - startingMZ * PPM / 10 .^ 6;
+    endingMZ = startAndEndBucketMZ(bucketNumber, 2);
+    thresholdFromAbove = endingMZ + endingMZ * PPM / 10 .^ 6;
+    for sampleNumber = 1:numberOfSamples
+        lastRowMatched = find(allPeaks(:, sampleNumber) >= thresholdFromBelow & allPeaks(:, sampleNumber) <= thresholdFromAbove, 1, 'last');
+        startAndEndIndex(bucketNumber + 1, sampleNumber) = lastRowMatched;
+    end
+end
 end
 
 
