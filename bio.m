@@ -18,7 +18,7 @@ allPeaks = getMatrixWithAllPeaks(maxScanSize);
 % creating the matched data
 % [matchedWithoutAnyProcessing, numberOfComponenets] = withoutAnyProcessing(allPeaksMZ, maxScanSize / 2, 1);
 % [matchedWithConstantBuckets, numberOfComponenets] = processingWithConstantBuckets(allPeaksMZ, maxScanSize / 2);
-[matchedWithoutAnyProcessing, numberOfComponenets] = processingWithRangesOfFirstSample(allPeaksMZ, maxScanSize / 2, longestColumnIndex);
+[matchedWithoutAnyProcessing, numberOfComponenets] = processingWithRangesOfLongestColumn(allPeaksMZ, maxScanSize / 2, longestColumnIndex);
 
 
 
@@ -29,8 +29,9 @@ finalMatrix = buildTheFinalMatrix(matchedWithoutAnyProcessing, allPeaksIntensity
 
 
 % functions
-function [matchedMatrix, startingCounter] = processingWithRangesOfFirstSample(allPeaks, maxScanSize, longestColumnIndex)
+function [matchedMatrix, counter] = processingWithRangesOfLongestColumn(allPeaks, maxScanSize, longestColumnIndex)
 global numberOfSamples;
+global PPM;
 matchedMatrix = NaN(maxScanSize, numberOfSamples);
 % lowMZ = data.data{1, currSample}.scan.lowMz;
 % highMZ = data.data{1, currSample}.scan.highMz;
@@ -38,16 +39,42 @@ startingCounter = 1;
 numberOfBuckets = 10;
 startAndEndBucketMZ = getStartAndEndBucketMZ(allPeaks(:, longestColumnIndex), numberOfBuckets, maxScanSize);
 startAndEndIndex = getStartAndEndIndex(allPeaks, startAndEndBucketMZ, numberOfBuckets);
-for row = 1:numberOfBuckets
-    startingMZ = startAndEndBucketMZ(row, 1);
-    endingMZ = startAndEndBucketMZ(row, 2);
-    [startingBucketIndex, endingBucketIndex] = getStartingAndEndingBucketIndex(allPeaks, startingMZ, endingMZ);
-    bucketSize = endingBucketIndex - startingBucketIndex + 1;
-    allPeaksCutted = allPeaks(startingBucketIndex:endingBucketIndex, :);
-    [bucketMatchedMatrix, startingCounter] = withoutAnyProcessing(allPeaksCutted, bucketSize, startingCounter);
-    matchedMatrix(startingRow:endingRow, :) = bucketMatchedMatrix;
+counter = startingCounter;
+for bucketNumber = 1:numberOfBuckets
+    for column = 1:numberOfSamples
+        startingIndex = 1;
+        if bucketNumber ~= 1
+            startingIndex = startAndEndIndex(bucketNumber, column) + 1;
+        end
+        rowsForIteration = startingIndex:startAndEndIndex(bucketNumber + 1, column);
+        for row = rowsForIteration
+            number = allPeaks(row, column);
+            counterInMatchedMatrix = matchedMatrix(row, column);
+            if isnan(counterInMatchedMatrix) && ~isnan(number)
+                matchedMatrix(row, column) = counter;
+                lowerThreshold = number - number * PPM / 10 .^ 6;
+                upperThreshold = number + number * PPM / 10 .^ 6;
+                for columnInternal = (column+1):numberOfSamples
+                    startingIndexForChecking = 1;
+                    if bucketNumber ~= 1
+                        startingIndexForChecking = startAndEndIndex(bucketNumber, columnInternal) + 1;
+                    end
+                    rowsForChecking = startingIndexForChecking:startAndEndIndex(bucketNumber + 1, columnInternal);                    
+                    columnData = allPeaks(rowsForChecking, columnInternal);
+                    rowFound = find(columnData >= lowerThreshold & columnData <= upperThreshold);
+                    if ~isempty(rowFound)
+                        addToRowIndex = 0;
+                        if bucketNumber ~= 1
+                            addToRowIndex = startAndEndIndex(bucketNumber, columnInternal);
+                        end
+                        matchedMatrix(rowFound + addToRowIndex, columnInternal) = counter;
+                    end
+                end
+                counter = counter + 1;
+            end
+        end
+    end    
 end
-
 end
 
 
