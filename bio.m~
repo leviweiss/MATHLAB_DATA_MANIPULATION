@@ -2,33 +2,54 @@
 global PPM;
 PPM = 5;
 global numberOfSamples;
-numberOfSamples = 100;
-global selectedIndexOfScan;
-selectedIndexOfScan = 1;
+global numberOfScansInEachSample;
 global data;
 
 % preperation
 data = load('matlab.mat');
 
-% creating the matrix of data
-[maxScanSize, longestColumnIndex] = getMaxScanSize();
-allPeaks = getMatrixWithAllPeaks(maxScanSize);
-[allPeaksMZ, allPeaksIntensity] = seperateIntensityFromMZ(allPeaks);
+numberOfSamples = getNumberOfSamples();
+% numberOfSamples = 100;
 
-% creating the matched data
-% [matchedWithoutAnyProcessing, numberOfComponenets] = withoutAnyProcessing(allPeaksMZ, maxScanSize / 2, 1);
-% [matchedWithConstantBuckets, numberOfComponenets] = processingWithConstantBuckets(allPeaksMZ, maxScanSize / 2);
-[matchedWithoutAnyProcessing, numberOfComponenets] = processingWithRangesOfLongestColumn(allPeaksMZ, maxScanSize / 2, longestColumnIndex);
+numberOfScansInEachSample = getNumberOfScansInEachSample();
+% numberOfScansInEachSample = 1;
 
+cellArrayOfFinalMatrixes = cell(1, numberOfScansInEachSample);
+pe selectedIndexOfScan = 1:numberOfScansInEachSample
+    tic
+    % creating the matrix of data
+    [maxScanSize, longestColumnIndex] = getMaxScanSize(selectedIndexOfScan);
+    allPeaks = getMatrixWithAllPeaks(maxScanSize, selectedIndexOfScan);
+    [allPeaksMZ, allPeaksIntensity] = seperateIntensityFromMZ(allPeaks);
 
+    % creating the matched data
+%     [matchedWithoutAnyProcessing, numberOfComponents] = withoutAnyProcessing(allPeaksMZ, maxScanSize / 2, 1);
+    % [matchedWithConstantBuckets, numberOfComponents] = processingWithConstantBuckets(allPeaksMZ, maxScanSize / 2);
+    [matchedWithoutAnyProcessing, numberOfComponents] = processingWithRangesOfLongestColumn(allPeaksMZ, maxScanSize / 2, longestColumnIndex);
 
-% computing the final matrix
-numberOfComponenets = numberOfComponenets - 1;
-finalMatrix = buildTheFinalMatrix(matchedWithoutAnyProcessing, allPeaksIntensity, numberOfComponenets);
+    % computing the final matrix
+    numberOfComponents = numberOfComponents - 1;
+    cellArrayOfFinalMatrixes{selectedIndexOfScan} = buildTheFinalMatrix(matchedWithoutAnyProcessing, allPeaksIntensity, numberOfComponents);
+    toc
+end
 
 
 
 % functions
+function numberOfSamples = getNumberOfSamples()
+global data;
+cellSize = size(data.data);
+numberOfSamples = cellSize(2);
+end
+
+
+function numberOfScansInEachSample = getNumberOfScansInEachSample()
+global data;
+structureSize = size(data.data{1, 1}.scan);
+numberOfScansInEachSample = structureSize(1);
+end
+
+
 function [matchedMatrix, counter] = processingWithRangesOfLongestColumn(allPeaks, maxScanSize, longestColumnIndex)
 global numberOfSamples;
 global PPM;
@@ -55,14 +76,19 @@ for bucketNumber = 1:numberOfBuckets
                 lowerThreshold = number - number * PPM / 10 .^ 6;
                 upperThreshold = number + number * PPM / 10 .^ 6;
                 for columnInternal = (column+1):numberOfSamples
-                    columnData = allPeaks(rowsForIteration, columnInternal);
+                    startingIndexForChecking = 1;
+                    if bucketNumber ~= 1
+                        startingIndexForChecking = startAndEndIndex(bucketNumber, columnInternal) + 1;
+                    end
+                    rowsForChecking = startingIndexForChecking:startAndEndIndex(bucketNumber + 1, columnInternal);                    
+                    columnData = allPeaks(rowsForChecking, columnInternal);
                     rowFound = find(columnData >= lowerThreshold & columnData <= upperThreshold);
                     if ~isempty(rowFound)
-                        addToRowIndex = 0
+                        addToRowIndex = 0;
                         if bucketNumber ~= 1
-                            startingIndex = startAndEndIndex(bucketNumber, column) + 1;
+                            addToRowIndex = startAndEndIndex(bucketNumber, columnInternal);
                         end
-                        matchedMatrix(rowFound + startAndEndIndex(bucketNumber, columnInternal), columnInternal) = counter;
+                        matchedMatrix(rowFound + addToRowIndex, columnInternal) = counter;
                     end
                 end
                 counter = counter + 1;
@@ -109,11 +135,10 @@ startAndEndBucketMZ(numberOfBuckets, 2) = columnPeaks(endingRow + reminder);
 end
 
 
-function finalMatrix = buildTheFinalMatrix(matchedMatrix, allPeaksIntensity, numberOfComponenets)
-
+function finalMatrix = buildTheFinalMatrix(matchedMatrix, allPeaksIntensity, numberOfComponents)
 global numberOfSamples;
-finalMatrix = NaN(numberOfComponenets, numberOfSamples);
-for componentNumber = 1:numberOfComponenets
+finalMatrix = NaN(numberOfComponents, numberOfSamples);
+for componentNumber = 1:numberOfComponents
     [rowsArray, columnsArray] = find(matchedMatrix == componentNumber);
     for index = 1:length(rowsArray)
         finalMatrix(componentNumber, columnsArray(index)) = allPeaksIntensity(rowsArray(index), columnsArray(index));
@@ -130,7 +155,6 @@ end
 
 
 function [matchedMatrix, startingCounter] = processingWithConstantBuckets(allPeaks, maxScanSize)
-
 global numberOfSamples;
 matchedMatrix = NaN(maxScanSize, numberOfSamples);
 bucketSize = 100;
@@ -159,27 +183,26 @@ end
 
 
 function [matchedMatrix, counter] = withoutAnyProcessing(allPeaks, maxScanSize, startingCounter)
-
 global PPM;
 global numberOfSamples;
 counter = startingCounter;
 matchedMatrix = NaN(maxScanSize, numberOfSamples);
-    for column = 1:numberOfSamples
-        for row = 1:maxScanSize
-            number = allPeaks(row, column);
-            counterInMatchedMatrix = matchedMatrix(row, column);
-            if isnan(counterInMatchedMatrix) && ~isnan(number)
-                matchedMatrix(row, column) = counter;
-                lowerThreshold = number - number * PPM / 10 .^ 6;
-                upperThreshold = number + number * PPM / 10 .^ 6;
-                for columnInternal = (column+1):numberOfSamples
-                    columnData = allPeaks(:, columnInternal);
-                    rowFound = find(columnData >= lowerThreshold & columnData <= upperThreshold);
-                    if ~isempty(rowFound)
-                        matchedMatrix(rowFound, columnInternal) = counter;
-                    end
-                    
-                    
+for column = 1:numberOfSamples
+    for row = 1:maxScanSize
+        number = allPeaks(row, column);
+        counterInMatchedMatrix = matchedMatrix(row, column);
+        if isnan(counterInMatchedMatrix) && ~isnan(number)
+            matchedMatrix(row, column) = counter;
+            lowerThreshold = number - number * PPM / 10 .^ 6;
+            upperThreshold = number + number * PPM / 10 .^ 6;
+            for columnInternal = (column+1):numberOfSamples
+                columnData = allPeaks(:, columnInternal);
+                rowFound = find(columnData >= lowerThreshold & columnData <= upperThreshold);
+                if ~isempty(rowFound)
+                    matchedMatrix(rowFound, columnInternal) = counter;
+                end
+
+
 %                     for rowInternal = 1:maxScanSize
 %                         numberInternal = allPeaks(rowInternal, columnInternal);
 %                         if ~isnan(numberInternal)
@@ -189,20 +212,18 @@ matchedMatrix = NaN(maxScanSize, numberOfSamples);
 %                             end
 %                         end
 %                     end
-                    
-                end
-                counter = counter + 1;
+
             end
+            counter = counter + 1;
         end
     end
 end
+end
 
 
-function allPeaks = getMatrixWithAllPeaks(maxScanSize)
-
+function allPeaks = getMatrixWithAllPeaks(maxScanSize, selectedIndexOfScan)
 global numberOfSamples;
 global data;
-global selectedIndexOfScan;
 allPeaks = NaN(maxScanSize, numberOfSamples);
 for currSample = 1:numberOfSamples
     currPeaks = data.data{1, currSample}.scan(selectedIndexOfScan).peaks.mz;
@@ -214,14 +235,13 @@ end
 end
 
 
-function [maxSize, index] = getMaxScanSize()
-
+function [maxSize, index] = getMaxScanSize(selectedIndexOfScan)
 global numberOfSamples;
 global data;
 maxSize = 0;
 index = 0;
 for currSample = 1:numberOfSamples
-    currSize = data.data{1, currSample}.scan.peaksCount;
+    currSize = data.data{1, currSample}.scan(selectedIndexOfScan).peaksCount;
     currSize = currSize * 2;
     if currSize > maxSize
         maxSize = currSize;
